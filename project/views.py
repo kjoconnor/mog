@@ -122,9 +122,41 @@ def slack_emoji():
     return all_slack_emoji
 
 
+def _parse_request(data):
+
+    parsed_data = {
+        'user': data['user_name'],
+        'error': False,
+        'error_text': '',
+    }
+
+    command = re.match(
+        '^(?P<command>add|delete|list)\s+(?:\:|)(?P<emoji_name>[0-9a-z-_]+)(?:\:|)',
+        data['text'],
+    ).groupdict()
+
+    try:
+        parsed_data.update({
+            'action': command['command'],
+            'emoji_name': command['emoji_name'],
+        })
+    except KeyError:
+        parsed_data.update({
+            'error': True,
+            'error_text': 'U suck idiot',
+        })
+
+    return parsed_data
+
+
+def _validate_outgoing_token(token):
+    # Check command is coming from Slack
+    return token == tokens.SLACK_OUTGOING_TOKEN
+
+
 def validate_command(request_form):
     """Check command entered by user is valid."""
-    # Obect that will be returned.
+    # Object that will be returned.
     validated_command = {
         'user': '',
         'action': '',
@@ -138,10 +170,10 @@ def validate_command(request_form):
 
     parsed_command = raw_command.split()
 
-    if request_form['token'] != tokens.SLACK_OUTGOING_TOKEN:
-        # Request is not coming from slack
+    if _validate_outgoing_token(request_form['token']):
         validated_command['error'] = True
         validated_command['error_text'] = "Invalid token."
+
     elif len(parsed_command) == 0:
         # No command was entered
         validated_command['error'] = True
@@ -181,6 +213,7 @@ def validate_command(request_form):
 def index():
     """Main endpoint that handles all MOG requests."""
     # validate command passed by user
+    print _parse_request(request.form)
     validated_command = validate_command(request.form)
     # load response into local variables
     user = validated_command['user']
@@ -253,5 +286,5 @@ def index():
         output = "something went horribly wrong"
 
     # ephemeral response means only the user that issues the command sees it
-    data = {"reponse_type": "ephemeral", "text": output}
+    data = {"response_type": "ephemeral", "text": output}
     return jsonify(data)
